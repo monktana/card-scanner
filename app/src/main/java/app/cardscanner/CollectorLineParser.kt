@@ -26,16 +26,22 @@ object CollectorLineParser {
 
     private const val LANGS = "EN|DE|FR|IT|ES|PT|JA|JP|KO|RU|ZHS|ZHT|PH"
 
-    private val setLang = Regex("""(?<![A-Z0-9])([A-Z0-9]{3,5})\s*[•·∙*.\-+]?\s*($LANGS)(?![A-Z])""")
+    // Zwischen Set und Sprache steht immer ein Trenner oder Leerraum. Ohne diese Bedingung
+    // würde aus deutschem Text wie "Idioten" das Set "IDIOT" mit Sprache "EN".
+    private val setLang = Regex("""(?<![A-Z0-9])([A-Z0-9]{3,5})(?:\s*[•·∙*.\-+]\s*|\s+)($LANGS)(?![A-Z])""")
 
     // "149/249" – Gesamtzahl mit 2–4 Stellen, kein Vorzeichen davor (schließt "+1/+1" aus).
     private val numberWithTotal = Regex("""(?<![\d+\-])(\d{1,4})\s*/\s*\d{2,4}(?!\d)""")
 
-    // "C 0149" bzw. "0149 C" (neues Format ohne Gesamtzahl, 3–4 Stellen).
-    private val rarityThenNumber = Regex("""(?<![A-Z0-9])([CURMLSTP])\s+(\d{3,4})(?!\d)""")
-    private val numberThenRarity = Regex("""(?<![\d/])(\d{3,4})\s+([CURMLSTP])(?![A-Z0-9])""")
+    // Neues Format: vierstellig mit führender Null ("0149"), Seltenheit davor oder dahinter,
+    // mit oder ohne Leerzeichen ("C0166"). Die OCR liest 0 oft als O ("CO176", "O08O").
+    // Die führende Null schließt das Copyright-Jahr ("© 2025", gelesen als "C 2025") aus.
+    private val paddedNumber = Regex(
+        """(?<![A-Z0-9/])(?:([CURMLSTP])\s*)?([0O](?=[0-9O]*[0-9])[0-9O]{3})(?![0-9A-Z])(?:\s*([CURMLSTP])(?![A-Z0-9]))?""",
+    )
 
-    private const val MAX_LINE_DISTANCE = 2
+    // Seltenheit und Nummer landen manchmal auf getrennten Zeilen, bis zu drei Zeilen weg.
+    private const val MAX_LINE_DISTANCE = 3
 
     fun parse(lines: List<String>): ParsedCollectorLine? {
         val upper = lines.map { it.uppercase() }
@@ -70,11 +76,9 @@ object CollectorLineParser {
                 ?.takeIf { it in "CURMLSTP" }
             return normalize(m.groupValues[1]) to rarity
         }
-        rarityThenNumber.find(text)?.let { m ->
-            return normalize(m.groupValues[2]) to m.groupValues[1].single()
-        }
-        numberThenRarity.find(text)?.let { m ->
-            return normalize(m.groupValues[1]) to m.groupValues[2].single()
+        paddedNumber.find(text)?.let { m ->
+            val rarity = (m.groups[1] ?: m.groups[3])?.value?.single()
+            return normalize(m.groupValues[2].replace('O', '0')) to rarity
         }
         return null
     }
