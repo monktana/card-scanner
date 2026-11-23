@@ -178,6 +178,15 @@ class CollectionRepositoryTest {
     }
 
     @Test
+    fun mehrereEintraegeLoeschen() = runTest {
+        val a = repo.addCopies(boltEn, foil = false, locationId = null, count = 3)
+        val b = repo.addCopies(boltEn, foil = true, locationId = null)
+        val keep = repo.addCopies(boltDe, foil = false, locationId = null)
+        repo.delete(listOf(a, b))
+        assertEquals(listOf(keep), entries().map { it.id })
+    }
+
+    @Test
     fun importErgaenztOderErsetzt() = runTest {
         repo.addCopies(boltEn, foil = false, locationId = null)
         val rows = CollectionExport.parseCsv(CollectionExport.csv(repo.entries.first()))

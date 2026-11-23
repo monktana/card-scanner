@@ -170,6 +170,11 @@ class CollectionRepository(
         rows.sumOf { it.quantity }
     }
 
+    /** Löscht mehrere Einträge vollständig (alle Exemplare). SQLite erlaubt nur begrenzt viele Parameter, daher in Blöcken. */
+    suspend fun delete(entryIds: Collection<Long>) = db.withTransaction {
+        entryIds.chunked(500).forEach { dao.deleteEntries(it) }
+    }
+
     suspend fun delete(entryId: Long) = db.withTransaction {
         dao.entry(entryId)?.let { dao.delete(it) }
     }

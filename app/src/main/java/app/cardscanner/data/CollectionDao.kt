@@ -37,6 +37,9 @@ interface CollectionDao {
     @Query("DELETE FROM entries")
     suspend fun deleteAllEntries()
 
+    @Query("DELETE FROM entries WHERE id IN (:ids)")
+    suspend fun deleteEntries(ids: List<Long>)
+
     @Insert
     suspend fun insert(entry: CollectionEntry): Long
 

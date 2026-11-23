@@ -1,6 +1,13 @@
 package app.cardscanner.ui
 
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.TextButton
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -46,18 +53,32 @@ fun CollectionScreen(viewModel: CollectionViewModel, onAddManually: () -> Unit) 
     val locations by viewModel.locations.collectAsState()
     val query by viewModel.query.collectAsState()
     var editing by remember { mutableStateOf<EntryWithLocation?>(null) }
+    val selected by viewModel.selected.collectAsState()
+    val selecting = selected.isNotEmpty()
+    var confirmDelete by remember { mutableStateOf(false) }
+
+    BackHandler(enabled = selecting) { viewModel.clearSelection() }
 
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize()) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                OutlinedTextField(
-                    value = query,
-                    onValueChange = { viewModel.query.value = it },
-                    placeholder = { Text("Suchen: Name, Set, Lagerort") },
-                    singleLine = true,
-                    modifier = Modifier.weight(1f).padding(start = 12.dp, top = 12.dp, bottom = 12.dp),
+            if (selecting) {
+                SelectionBar(
+                    count = selected.size,
+                    onSelectAll = viewModel::selectAllVisible,
+                    onDelete = { confirmDelete = true },
+                    onCancel = viewModel::clearSelection,
                 )
-                CollectionMenu(viewModel)
+            } else {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    OutlinedTextField(
+                        value = query,
+                        onValueChange = { viewModel.query.value = it },
+                        placeholder = { Text("Suchen: Name, Set, Lagerort") },
+                        singleLine = true,
+                        modifier = Modifier.weight(1f).padding(start = 12.dp, top = 12.dp, bottom = 12.dp),
+                    )
+                    CollectionMenu(viewModel)
+                }
             }
             val notice by viewModel.notice.collectAsState()
             notice?.let {
@@ -80,15 +101,45 @@ fun CollectionScreen(viewModel: CollectionViewModel, onAddManually: () -> Unit) 
             }
             LazyColumn(Modifier.fillMaxSize()) {
                 items(entries, key = { it.entry.id }) { item ->
-                    EntryRow(item) { editing = item }
+                    val id = item.entry.id
+                    EntryRow(
+                        item = item,
+                        selecting = selecting,
+                        selected = id in selected,
+                        onClick = { if (selecting) viewModel.toggleSelected(id) else editing = item },
+                        onLongClick = { viewModel.toggleSelected(id) },
+                    )
                     HorizontalDivider()
                 }
             }
         }
-        FloatingActionButton(
-            onClick = onAddManually,
-            modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
-        ) { Icon(Icons.Filled.Add, contentDescription = "Karte suchen und hinzufügen") }
+        if (!selecting) {
+            FloatingActionButton(
+                onClick = onAddManually,
+                modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
+            ) { Icon(Icons.Filled.Add, contentDescription = "Karte suchen und hinzufügen") }
+        }
+    }
+
+    if (confirmDelete) {
+        val chosen = entries.filter { it.entry.id in selected }
+        AlertDialog(
+            onDismissRequest = { confirmDelete = false },
+            title = { Text("Einträge löschen?") },
+            text = {
+                Text(
+                    "${selected.size} Einträge mit ${chosen.sumOf { it.entry.quantity }} Karten werden aus der Sammlung " +
+                        "gelöscht. Das lässt sich nicht rückgängig machen.",
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmDelete = false
+                    viewModel.deleteSelected()
+                }) { Text("Löschen") }
+            },
+            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("Abbrechen") } },
+        )
     }
 
     editing?.let { item ->
@@ -105,15 +156,39 @@ fun CollectionScreen(viewModel: CollectionViewModel, onAddManually: () -> Unit) 
 }
 
 @Composable
-private fun EntryRow(item: EntryWithLocation, onClick: () -> Unit) {
+private fun SelectionBar(count: Int, onSelectAll: () -> Unit, onDelete: () -> Unit, onCancel: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.secondaryContainer).padding(horizontal = 4.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        TextButton(onClick = onCancel) { Text("✕") }
+        Text("$count ausgewählt", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+        TextButton(onClick = onSelectAll) { Text("Alle") }
+        Button(onClick = onDelete, modifier = Modifier.padding(end = 8.dp)) { Text("Löschen") }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun EntryRow(
+    item: EntryWithLocation,
+    selecting: Boolean,
+    selected: Boolean,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit,
+) {
     val e = item.entry
     Row(
         Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .background(if (selected) MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f) else Color.Transparent)
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
             .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        if (selecting) {
+            Checkbox(checked = selected, onCheckedChange = { onClick() })
+        }
         CardThumb(e.imageUrl, e.name)
         SpacerW(12.dp)
         Column(Modifier.weight(1f)) {

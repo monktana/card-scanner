@@ -69,6 +69,36 @@ class CollectionViewModel(
         }
     }
 
+    // --- Mehrfachauswahl ----------------------------------------------------------------
+
+    /** Ausgewählte Einträge; leer heißt: keine Auswahl aktiv. */
+    val selected = MutableStateFlow<Set<Long>>(emptySet())
+
+    fun toggleSelected(entryId: Long) {
+        selected.value = selected.value.let { if (entryId in it) it - entryId else it + entryId }
+    }
+
+    /** Wählt alle gerade angezeigten (gefilterten) Einträge; sind schon alle gewählt, hebt es die Auswahl auf. */
+    fun selectAllVisible() {
+        val visible = entries.value.map { it.entry.id }.toSet()
+        selected.value = if (selected.value.containsAll(visible)) emptySet() else visible
+    }
+
+    fun clearSelection() {
+        selected.value = emptySet()
+    }
+
+    fun deleteSelected() {
+        val ids = selected.value
+        if (ids.isEmpty()) return
+        viewModelScope.launch {
+            val cards = entries.value.filter { it.entry.id in ids }.sumOf { it.entry.quantity }
+            repository.delete(ids)
+            selected.value = emptySet()
+            notice.value = "${ids.size} Einträge ($cards Karten) gelöscht."
+        }
+    }
+
     // --- Export / Import ---------------------------------------------------------------
 
     /** Meldung nach Export oder Import. */
