@@ -28,7 +28,8 @@ object CollectorLineParser {
 
     // Zwischen Set und Sprache steht immer ein Trenner oder Leerraum. Ohne diese Bedingung
     // würde aus deutschem Text wie "Idioten" das Set "IDIOT" mit Sprache "EN".
-    private val setLang = Regex("""(?<![A-Z0-9])([A-Z0-9]{3,5})(?:\s*[•·∙*.\-+]\s*|\s+)($LANGS)(?![A-Z])""")
+    // Gruppe 2 ist der Trenner; fehlt er, stand nur Leerraum dazwischen.
+    private val setLang = Regex("""(?<![A-Z0-9])([A-Z0-9]{3,5})(?:\s*([•·∙*.\-+])\s*|\s+)($LANGS)(?![A-Z])""")
 
     // "149/249" – Gesamtzahl mit 2–4 Stellen, kein Vorzeichen davor (schließt "+1/+1" aus).
     private val numberWithTotal = Regex("""(?<![\d+\-])(\d{1,4})\s*/\s*\d{2,4}(?!\d)""")
@@ -43,18 +44,32 @@ object CollectorLineParser {
     // Seltenheit und Nummer landen manchmal auf getrennten Zeilen, bis zu drei Zeilen weg.
     private const val MAX_LINE_DISTANCE = 3
 
-    fun parse(lines: List<String>): ParsedCollectorLine? {
+    private class SetLine(val index: Int, val match: MatchResult, val setCode: String) {
+        val hasSeparator get() = match.groups[2] != null
+        val language get() = match.groupValues[3]
+    }
+
+    /**
+     * @param resolveSet prüft einen gelesenen Set-Code gegen die bekannten Sets und gibt den
+     *   richtigen Code zurück (z. B. "M2O" → "M20") oder null, wenn es kein Set ist.
+     *   Ohne Setliste wird jeder Code angenommen.
+     */
+    fun parse(lines: List<String>, resolveSet: (String) -> String? = { it }): ParsedCollectorLine? {
         val upper = lines.map { it.uppercase() }
 
-        for ((index, line) in upper.withIndex()) {
-            val match = setLang.findAll(line).firstOrNull { m ->
-                m.groupValues[1].any(Char::isLetter)
-            } ?: continue
-            val setCode = match.groupValues[1]
-            val language = match.groupValues[2]
+        // Regeltext liefert falsche Kandidaten ("EXILE IT", "WENN ES"). Daher alle sammeln, nur
+        // bekannte Sets behalten und die mit Trenner ("TLA • DE") sowie weiter unten zuerst prüfen.
+        val setLines = upper.withIndex().flatMap { (index, line) ->
+            setLang.findAll(line)
+                .filter { m -> m.groupValues[1].any(Char::isLetter) }
+                .mapNotNull { m -> resolveSet(m.groupValues[1])?.let { SetLine(index, m, it) } }
+                .toList()
+        }.sortedWith(compareByDescending<SetLine> { it.hasSeparator }.thenByDescending { it.index })
 
+        for (setLine in setLines) {
+            val index = setLine.index
             // Zuerst in derselben Zeile (ohne den Set-Teil), dann in den Nachbarzeilen suchen.
-            val sameLine = line.removeRange(match.range)
+            val sameLine = upper[index].removeRange(setLine.match.range)
             val candidates = buildList {
                 add(sameLine)
                 for (d in 1..MAX_LINE_DISTANCE) {
@@ -64,7 +79,7 @@ object CollectorLineParser {
             }
             for (text in candidates) {
                 val number = findNumber(text) ?: continue
-                return ParsedCollectorLine(setCode, number.first, language, number.second)
+                return ParsedCollectorLine(setLine.setCode, number.first, setLine.language, number.second)
             }
         }
         return null

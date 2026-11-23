@@ -63,8 +63,22 @@ class ScryfallClient {
         else -> printed.lowercase()
     }
 
+    /** Alle Set-Codes (klein geschrieben, wie Scryfall sie führt). */
+    suspend fun fetchSetCodes(): List<String> = withContext(Dispatchers.IO) {
+        val json = request("sets") ?: throw IOException("Scryfall /sets nicht gefunden")
+        val data = json.getJSONArray("data")
+        List(data.length()) { data.getJSONObject(it).getString("code") }
+    }
+
     private suspend fun get(path: String): ScryfallCard? {
         cache[path]?.let { return it.card }
+        val card = request(path)?.let(::parseCard)
+        cache[path] = Optional(card)
+        return card
+    }
+
+    /** GET mit Mindestabstand; null bei 404. */
+    private suspend fun request(path: String): JSONObject? {
         rateLimit.withLock {
             val wait = lastRequestAt + MIN_INTERVAL_MS - System.currentTimeMillis()
             if (wait > 0) delay(wait)
@@ -75,14 +89,12 @@ class ScryfallClient {
             connection.setRequestProperty("User-Agent", USER_AGENT)
             connection.setRequestProperty("Accept", "application/json")
             connection.connectTimeout = 5_000
-            connection.readTimeout = 5_000
-            val card = when (val code = connection.responseCode) {
-                200 -> parseCard(JSONObject(connection.inputStream.bufferedReader().readText()))
+            connection.readTimeout = 10_000
+            return when (val code = connection.responseCode) {
+                200 -> JSONObject(connection.inputStream.bufferedReader().readText())
                 404 -> null
                 else -> throw IOException("Scryfall HTTP $code")
             }
-            cache[path] = Optional(card)
-            return card
         } finally {
             connection.disconnect()
         }

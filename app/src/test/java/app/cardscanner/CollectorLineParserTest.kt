@@ -102,6 +102,46 @@ class CollectorLineParserTest {
         assertEquals(CollectorKey("TLA", "80"), parse("IM &© 2025 Wizards", "TLA DE >SYLVAIN SARRAILH", "C O08o")!!.key)
     }
 
+    // Regeltext enthält Wörter, die wie "SET SPRACHE" aussehen. Die Setliste filtert sie heraus.
+
+    private val catalog = SetCatalog(listOf("mkm", "tla", "lci", "m20", "2x2"))
+
+    private fun parseKnown(vararg lines: String) = CollectorLineParser.parse(lines.toList(), catalog::resolve)
+
+    @Test
+    fun `englischer Regeltext wird nicht zum Set`() {
+        val p = parseKnown("Exile it. Its controller", "gains 3 life.", "3/3", "0123 R", "MKM • EN")!!
+        assertEquals(CollectorKey("MKM", "123"), p.key)
+        assertEquals("EN", p.language)
+    }
+
+    @Test
+    fun `deutscher Regeltext wird nicht zum Set`() {
+        val p = parseKnown("Wenn es stirbt, ziehe", "eine Karte.", "C", "0049", "TLA • DE")!!
+        assertEquals(CollectorKey("TLA", "49"), p.key)
+        assertEquals("DE", p.language)
+    }
+
+    @Test
+    fun `Regeltext wird nicht zum Set, auch wenn der Trenner fehlt`() {
+        assertEquals(CollectorKey("TLA", "49"), parseKnown("Wenn es stirbt.", "C", "0049", "TLA DE")!!.key)
+    }
+
+    @Test
+    fun `ohne Setliste gewinnt die Zeile mit Trenner`() {
+        assertEquals(CollectorKey("TLA", "49"), parse("Wenn es stirbt, ziehe", "C", "0049", "TLA • DE")!!.key)
+    }
+
+    @Test
+    fun `Setliste korrigiert O und 0 im Set-Code`() {
+        assertEquals(CollectorKey("M20", "149"), parseKnown("149/280 C", "M2O • EN")!!.key)
+    }
+
+    @Test
+    fun `unbekanntes Set ergibt kein Ergebnis`() {
+        assertNull(parseKnown("0123 R", "XYZ • EN"))
+    }
+
     @Test
     fun `Seltenheit und Nummer auf getrennten Zeilen`() {
         val p = parse("IM & C2025 Wizards of the Coast", "C2025", "Viacom.", "TLA • DE", "KS/MIZUTAMETORI", "C", "0049")!!

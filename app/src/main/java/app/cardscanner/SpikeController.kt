@@ -10,6 +10,8 @@ import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
@@ -47,6 +49,25 @@ class SpikeController(context: Context, private val scope: CoroutineScope) {
     private val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
     private val scryfall = ScryfallClient()
     private val log = SpikeLog(File(context.filesDir, "spike"))
+
+    // Bis die Setliste geladen ist (oder wenn sie fehlt), wird jeder Set-Code angenommen.
+    @Volatile private var setCatalog: SetCatalog? = null
+
+    init {
+        val loader = SetCatalogLoader(File(context.filesDir, "sets.txt"), scryfall)
+        scope.launch {
+            val catalog = withContext(Dispatchers.IO) { loader.load() }
+            setCatalog = catalog
+            _state.update {
+                it.copy(message = catalog?.let { c -> "Setliste: ${c.size} Sets" } ?: "Setliste nicht geladen, Set-Codes ungeprüft")
+            }
+        }
+    }
+
+    private fun resolveSet(raw: String): String? {
+        val catalog = setCatalog ?: return raw
+        return catalog.resolve(raw)
+    }
 
     // Nur im analysisExecutor verwendet.
     private var currentKey: CollectorKey? = null
@@ -89,7 +110,7 @@ class SpikeController(context: Context, private val scope: CoroutineScope) {
     }
 
     private fun onLines(lines: List<String>, ocrMs: Long) {
-        val parsed = CollectorLineParser.parse(lines)
+        val parsed = CollectorLineParser.parse(lines, ::resolveSet)
         val key = parsed?.key
         _state.update { it.copy(rawLines = lines, parsed = parsed, ocrMs = ocrMs, frames = it.frames + 1) }
 
