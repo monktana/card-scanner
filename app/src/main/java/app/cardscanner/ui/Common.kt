@@ -144,7 +144,11 @@ private fun LocationDialog(
             }
         },
         confirmButton = {
-            TextButton(enabled = name.isNotBlank(), onClick = { onPick(LocationChoice.New(kind, name)) }) {
+            TextButton(enabled = name.isNotBlank(), onClick = {
+                // Gibt es den Lagerort schon, wird er gewählt statt neu angelegt.
+                val existing = locations.find { it.kind == kind && it.name == name.trim() }
+                onPick(existing?.let { LocationChoice.Existing(it) } ?: LocationChoice.New(kind, name))
+            }) {
                 Text("Neu anlegen")
             }
         },

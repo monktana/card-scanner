@@ -21,6 +21,12 @@ interface CollectionDao {
     @Query("SELECT * FROM entries WHERE id = :id")
     suspend fun entry(id: Long): CollectionEntry?
 
+    @Query("SELECT * FROM entries WHERE id IN (:ids)")
+    fun observeEntries(ids: List<Long>): Flow<List<CollectionEntry>>
+
+    @Query("SELECT * FROM entries WHERE locationId = :locationId")
+    suspend fun entriesIn(locationId: Long): List<CollectionEntry>
+
     // "IS" statt "=", damit auch "ohne Lagerort" (NULL) passt.
     @Query("SELECT * FROM entries WHERE scryfallId = :scryfallId AND foil = :foil AND locationId IS :locationId LIMIT 1")
     suspend fun findSame(scryfallId: String, foil: Boolean, locationId: Long?): CollectionEntry?

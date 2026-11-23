@@ -63,6 +63,78 @@ class CollectionRepository(
         }
     }
 
+    fun observeEntries(ids: Collection<Long>): Flow<List<CollectionEntry>> = dao.observeEntries(ids.toList())
+
+    /** Anzahl je Eintrag in einem Lagerort, z. B. als Stand vor „Deck ersetzen“. */
+    suspend fun quantitiesIn(locationId: Long): Map<Long, Int> =
+        dao.entriesIn(locationId).associate { it.id to it.quantity }
+
+    /**
+     * Verschiebt [count] Exemplare eines Eintrags in einen anderen (Foil, Lagerort). Der alte
+     * Eintrag wird gelöscht, wenn nichts übrig bleibt. Gibt die ID des Ziel-Eintrags zurück.
+     */
+    suspend fun moveCopies(entryId: Long, count: Int, foil: Boolean, locationId: Long?): Long? =
+        db.withTransaction {
+            val source = dao.entry(entryId) ?: return@withTransaction null
+            val moved = count.coerceIn(0, source.quantity)
+            if (moved == 0) return@withTransaction null
+            if (source.foil == foil && source.locationId == locationId) return@withTransaction source.id
+            val now = clock()
+            removeFrom(source, moved, now)
+            val target = dao.findSame(source.scryfallId, foil, locationId)
+            if (target != null) {
+                dao.update(target.copy(quantity = target.quantity + moved, updatedAt = now))
+                target.id
+            } else {
+                dao.insert(source.copy(id = 0, foil = foil, locationId = locationId, quantity = moved, addedAt = now, updatedAt = now))
+            }
+        }
+
+    suspend fun addToEntry(entryId: Long, count: Int) = db.withTransaction {
+        dao.entry(entryId)?.let { dao.update(it.copy(quantity = it.quantity + count, updatedAt = clock())) }
+    }
+
+    /** Nimmt Exemplare weg, z. B. einen verworfenen Scan. Bei 0 wird der Eintrag gelöscht. */
+    suspend fun removeCopies(entryId: Long, count: Int) = db.withTransaction {
+        dao.entry(entryId)?.let { removeFrom(it, count.coerceIn(0, it.quantity), clock()) }
+    }
+
+    /**
+     * Schließt „Deck ersetzen“ ab. Im Deck bleibt je Eintrag genau, was gescannt wurde; was
+     * vorher im Deck war und nicht mehr gescannt wurde, wandert nach Bulk „Aus Decks“.
+     * Einträge, die weder vorher da waren noch gescannt wurden (z. B. nebenbei von Hand
+     * hinzugefügt), bleiben unverändert.
+     *
+     * @param before Anzahl je Eintrag beim Start der Sitzung
+     * @param scanned in der Sitzung gescannte Exemplare je Eintrag
+     */
+    suspend fun finishDeckReplace(locationId: Long, before: Map<Long, Int>, scanned: Map<Long, Int>) =
+        db.withTransaction {
+            val now = clock()
+            var removedBulk: StorageLocation? = null
+            for (entry in dao.entriesIn(locationId)) {
+                val old = before[entry.id] ?: 0
+                if (old == 0 && entry.id !in scanned) continue
+                val new = scanned[entry.id] ?: 0
+                val removed = (old - new).coerceAtLeast(0)
+                if (new == 0) dao.delete(entry) else dao.update(entry.copy(quantity = new, updatedAt = now))
+                if (removed > 0) {
+                    val bulkId = (removedBulk ?: location(LocationKind.BULK, FROM_DECKS).also { removedBulk = it }).id
+                    val target = dao.findSame(entry.scryfallId, entry.foil, bulkId)
+                    if (target != null) {
+                        dao.update(target.copy(quantity = target.quantity + removed, updatedAt = now))
+                    } else {
+                        dao.insert(entry.copy(id = 0, locationId = bulkId, quantity = removed, addedAt = now, updatedAt = now))
+                    }
+                }
+            }
+        }
+
+    private suspend fun removeFrom(entry: CollectionEntry, count: Int, now: Long) {
+        val left = entry.quantity - count
+        if (left <= 0) dao.delete(entry) else dao.update(entry.copy(quantity = left, updatedAt = now))
+    }
+
     suspend fun delete(entryId: Long) = db.withTransaction {
         dao.entry(entryId)?.let { dao.delete(it) }
     }
@@ -75,6 +147,11 @@ class CollectionRepository(
             dao.findLocation(kind, trimmed)
                 ?: StorageLocation(kind = kind, name = trimmed).let { it.copy(id = dao.insertLocation(it)) }
         }
+    }
+
+    companion object {
+        /** Bulk-Lagerort für Karten, die beim Neuscannen aus einem Deck gefallen sind. */
+        const val FROM_DECKS = "Aus Decks"
     }
 
     private fun ScryfallCard.toEntry(foil: Boolean, locationId: Long?, quantity: Int, now: Long) =

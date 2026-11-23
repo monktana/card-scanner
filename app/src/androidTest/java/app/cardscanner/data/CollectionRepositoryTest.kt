@@ -100,8 +100,59 @@ class CollectionRepositoryTest {
         assertEquals(box.id, entry.locationId)
     }
 
-    private fun card(id: String, lang: String, printedName: String? = null) = ScryfallCard(
-        id = id, oracleId = "bolt", name = "Lightning Bolt", printedName = printedName,
+    @Test
+    fun foilUmschaltenVerschiebtNurDieGescanntenExemplare() = runTest {
+        val id = repo.addCopies(boltEn, foil = false, locationId = null, count = 3)
+        val foilId = repo.moveCopies(id, count = 1, foil = true, locationId = null)!!
+        val all = entries().associateBy { it.id }
+        assertEquals(2, all.getValue(id).quantity)
+        assertEquals(1, all.getValue(foilId).quantity)
+        assertTrue(all.getValue(foilId).foil)
+    }
+
+    @Test
+    fun verwerfenNimmtExemplareWeg() = runTest {
+        val id = repo.addCopies(boltEn, foil = false, locationId = null, count = 2)
+        repo.removeCopies(id, 1)
+        assertEquals(1, entries().single().quantity)
+        repo.removeCopies(id, 1)
+        assertTrue(entries().isEmpty())
+    }
+
+    // Deck ersetzen: Vorher Sol Ring + Bolt im Deck, neu gescannt Sol Ring + Counterspell.
+    @Test
+    fun deckErsetzenBehaeltGescanntesUndVerschiebtDenRest() = runTest {
+        val deck = repo.location(LocationKind.DECK, "vivi-ornitier")
+        val solRing = card("sol-ring", "en", name = "Sol Ring")
+        val counter = card("counterspell", "en", name = "Counterspell")
+        val solId = repo.addCopies(solRing, foil = false, locationId = deck.id)
+        val boltId = repo.addCopies(boltEn, foil = false, locationId = deck.id)
+        val before = repo.quantitiesIn(deck.id)
+
+        // Sitzung: Sol Ring landet im selben Eintrag (Anzahl kurz 2), Counterspell ist neu.
+        repo.addCopies(solRing, foil = false, locationId = deck.id)
+        val counterId = repo.addCopies(counter, foil = false, locationId = deck.id)
+        repo.finishDeckReplace(deck.id, before, scanned = mapOf(solId to 1, counterId to 1))
+
+        val all = repo.entries.first()
+        val inDeck = all.filter { it.location?.id == deck.id }.associate { it.entry.name to it.entry.quantity }
+        val removed = all.filter { it.location?.name == CollectionRepository.FROM_DECKS }.map { it.entry.name to it.entry.quantity }
+        assertEquals(mapOf("Sol Ring" to 1, "Counterspell" to 1), inDeck)
+        assertEquals(listOf("Lightning Bolt" to 1), removed)
+        assertTrue(all.none { it.entry.id == boltId })
+    }
+
+    @Test
+    fun deckErsetzenLaesstNebenbeiHinzugefuegtesInRuhe() = runTest {
+        val deck = repo.location(LocationKind.DECK, "zwerge")
+        val before = repo.quantitiesIn(deck.id)
+        repo.addCopies(boltEn, foil = false, locationId = deck.id)
+        repo.finishDeckReplace(deck.id, before, scanned = emptyMap())
+        assertEquals(1, entries().single().quantity)
+    }
+
+    private fun card(id: String, lang: String, printedName: String? = null, name: String = "Lightning Bolt") = ScryfallCard(
+        id = id, oracleId = id, name = name, printedName = printedName,
         setCode = "m11", setName = "Magic 2011", collectorNumber = "149", lang = lang, imageUrl = null,
     )
 }

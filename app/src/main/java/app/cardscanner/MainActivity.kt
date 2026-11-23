@@ -27,19 +27,22 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import androidx.compose.runtime.collectAsState
+import app.cardscanner.scan.ScanController
 import app.cardscanner.ui.CollectionScreen
+import app.cardscanner.ui.ScanTab
 import app.cardscanner.ui.CollectionViewModel
 import app.cardscanner.ui.ManualSearchScreen
 import app.cardscanner.ui.SearchViewModel
 
 class MainActivity : ComponentActivity() {
 
-    private lateinit var controller: SpikeController
+    private lateinit var controller: ScanController
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val app = application as CardScannerApp
-        controller = SpikeController(applicationContext, lifecycleScope)
+        controller = ScanController(applicationContext, lifecycleScope, app.repository, app.scryfall)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
         val factory = viewModelFactory {
@@ -49,9 +52,11 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             MaterialTheme(colorScheme = darkColorScheme()) {
+                val collectionViewModel: CollectionViewModel = viewModel(factory = factory)
+                val locations by collectionViewModel.locations.collectAsState()
                 AppRoot(
-                    scan = { PermissionGate { SpikeScreen(controller, this@MainActivity) } },
-                    collectionViewModel = viewModel(factory = factory),
+                    scan = { ScanTab(controller, locations, this@MainActivity) },
+                    collectionViewModel = collectionViewModel,
                     searchViewModel = viewModel(factory = factory),
                 )
             }

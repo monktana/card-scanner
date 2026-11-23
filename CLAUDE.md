@@ -23,7 +23,9 @@ Android-App (nur Pixel 9, nur privat) zum Scannen von Magic-Karten in einer Hand
 - **Deck neu scannen:** Gibt es den Decknamen schon, fragt die App „Ersetzen“ oder „Ergänzen“. Beim Ersetzen werden die alten Einträge erst beim Abschließen der Sitzung entfernt. Karten, die nicht mehr im Deck sind, landen im Bulk-Lagerort „Aus Decks“.
 - **Verschieben** am Eintrag, mit Anzahl und Ziel-Lagerort.
 - **Export:** Feste Dateinamen `sammlung.txt` und `sammlung.csv`, beide zusammen über das Teilen-Menü. Die Gruppen heißen `#! Deck: <name>`, `#! Bulk: <name>` und `#! Ohne Lagerort`. Die CSV hat die zusätzliche Spalte `art`.
-- **Diagnose-Ansicht** (ausgeblendet, langes Drücken auf den Scan-Reiter): Rohtext, „Nicht erkannt: Bild speichern“, `treffer.csv`. Werkzeug zum Verbessern des Parsers.
+- **Diagnose-Ansicht** (ausgeblendet, langes Drücken auf den Lagerort-Namen in der laufenden Scan-Sitzung): Rohtext, „Nicht erkannt: Bild speichern“, `treffer.csv`. Werkzeug zum Verbessern des Parsers.
+
+- **Scan-Sitzung:** Startbildschirm (Lagerort, Foil-Modus, bei vorhandenem Deck Ergänzen/Ersetzen), dann erst die Kamera. Jeder Treffer wird sofort gespeichert. Die Sitzung liegt in `session.json` und übersteht einen Neustart der App. „Nicht erkannt“ kommt nach 3 s mit Text (mindestens 4 Zeilen) ohne Set und Nummer.
 
 ## Reihenfolge
 
