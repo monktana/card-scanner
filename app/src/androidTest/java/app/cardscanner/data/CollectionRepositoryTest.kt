@@ -111,6 +111,24 @@ class CollectionRepositoryTest {
     }
 
     @Test
+    fun teilmengeInAnderenLagerortVerschieben() = runTest {
+        val box = repo.location(LocationKind.BULK, "Box 1")
+        val deck = repo.location(LocationKind.DECK, "vivi-ornitier")
+        val source = repo.addCopies(boltEn, foil = false, locationId = box.id, count = 3)
+        repo.addCopies(boltEn, foil = false, locationId = deck.id)
+
+        val target = repo.moveCopies(source, count = 1, foil = false, locationId = deck.id)!!
+        val all = entries().associateBy { it.id }
+        assertEquals(2, all.getValue(source).quantity)
+        assertEquals(2, all.getValue(target).quantity) // mit vorhandenem Deck-Eintrag zusammengeführt
+        assertEquals(deck.id, all.getValue(target).locationId)
+
+        // Alles verschieben: Der alte Eintrag verschwindet.
+        repo.moveCopies(source, count = 2, foil = false, locationId = deck.id)
+        assertEquals(4, entries().single().quantity)
+    }
+
+    @Test
     fun verwerfenNimmtExemplareWeg() = runTest {
         val id = repo.addCopies(boltEn, foil = false, locationId = null, count = 2)
         repo.removeCopies(id, 1)

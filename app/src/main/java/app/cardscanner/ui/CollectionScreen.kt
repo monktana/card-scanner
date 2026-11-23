@@ -209,6 +209,45 @@ private fun EntryRow(
     }
 }
 
+/** Verschiebt einen Teil der Exemplare in einen anderen Lagerort, z. B. 1 von 3 aus der Box ins Deck. */
+@Composable
+private fun MoveDialog(
+    item: EntryWithLocation,
+    locations: List<StorageLocation>,
+    viewModel: CollectionViewModel,
+    onDismiss: () -> Unit,
+    onMoved: () -> Unit,
+) {
+    val e = item.entry
+    val current = LocationChoice.of(item.location)
+    var count by remember { mutableStateOf(1) }
+    var target by remember { mutableStateOf(current) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Exemplare verschieben") },
+        text = {
+            Column {
+                Text("${e.printedName ?: e.name} · ${e.setCode.uppercase()} ${e.collectorNumber}" + if (e.foil) " · Foil" else "")
+                Text("Von: ${current.label} (${e.quantity} Stück)", color = Color.Gray)
+                Spacer(Modifier.height(12.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Anzahl", Modifier.weight(1f))
+                    QuantityStepper(count, { count = it }, min = 1, max = e.quantity)
+                }
+                LocationField(target, locations) { target = it }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = target.label != current.label,
+                onClick = { viewModel.move(item, count, target, onMoved) },
+            ) { Text("Verschieben") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Abbrechen") } },
+    )
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun EditEntrySheet(
@@ -223,7 +262,12 @@ private fun EditEntrySheet(
     var lang by remember { mutableStateOf(e.lang) }
     var location by remember { mutableStateOf(LocationChoice.of(item.location)) }
     var confirmDelete by remember { mutableStateOf(false) }
+    var moving by remember { mutableStateOf(false) }
     val error by viewModel.error.collectAsState()
+
+    if (moving) {
+        MoveDialog(item, locations, viewModel, onDismiss = { moving = false }, onMoved = onDismiss)
+    }
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(Modifier.padding(horizontal = 20.dp).padding(bottom = 24.dp)) {
@@ -250,6 +294,7 @@ private fun EditEntrySheet(
                 LanguageChoice(lang) { lang = it }
             }
             LocationField(location, locations) { location = it }
+            TextButton(onClick = { moving = true }) { Text("Exemplare verschieben …") }
             error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             Spacer(Modifier.height(16.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {

@@ -32,8 +32,8 @@ Android-App (nur Pixel 9, nur privat) zum Scannen von Magic-Karten in einer Hand
 ## Reihenfolge
 
 1. **Spike (abgeschlossen 23.11.2026):** Kamera-Vorschau mit Live-OCR, Anzeige von gelesenem Wert und Scryfall-Treffer, ohne Speichern. Ergebnis: Der OCR-Ansatz trägt. Zweiter Lauf 14 von 15 erkannt (DE/EN, 9 Sets, Basic Lands), 0,8–1,5 s von der ersten Erkennung bis zum Treffer. Die eine Ausnahme ist eine alte Karte ohne Set-Code (Prophecy, 2000). Sven hat nur diese eine alte Karte.
-2. **MVP:** Dauerscan, Bestätigung, Room-Datenbank, Liste, Bearbeiten, Lagerort, manuelle Suche, Export.
-3. **Danach:** CSV-Re-Import, Cache-Optimierung. Ein OCR-Rückfall für alte Karten ohne Set-Code wird nicht gebaut, weil es kaum solche Karten gibt. Falls doch nötig: Nummer aus `45/143` (OCR liest den Schrägstrich auch als Punkt) und Scryfall-Suche `cn:45 lang:de`, dazu lokal den OCR-Namen mit `printed_name` vergleichen. `/cards/named?fuzzy=` findet keine deutschen Namen.
+2. **MVP (fertig 23.11.2026):** Dauerscan, Bestätigung, Room-Datenbank, Liste, Bearbeiten, Lagerort, manuelle Suche, Export und CSV-Import, Verschieben mit Anzahl. Dazugekommen sind Mehrfachauswahl zum Löschen und die Lagerort-Verwaltung (Umbenennen und Zusammenführen, Löschen mit Verschieben der Karten).
+3. **Danach:** Cache-Optimierung. Ein OCR-Rückfall für alte Karten ohne Set-Code wird nicht gebaut, weil es kaum solche Karten gibt. Falls doch nötig: Nummer aus `45/143` (OCR liest den Schrägstrich auch als Punkt) und Scryfall-Suche `cn:45 lang:de`, dazu lokal den OCR-Namen mit `printed_name` vergleichen. `/cards/named?fuzzy=` findet keine deutschen Namen.
 
 ## Bauen
 

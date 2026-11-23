@@ -64,6 +64,19 @@ class CollectionViewModel(
         }
     }
 
+    /** Verschiebt [count] Exemplare in einen anderen Lagerort; Foil bleibt, wie es ist. */
+    fun move(item: EntryWithLocation, count: Int, target: LocationChoice, onDone: () -> Unit) {
+        viewModelScope.launch {
+            val e = item.entry
+            val targetId = repository.resolve(target)
+            if (targetId != e.locationId) {
+                repository.moveCopies(e.id, count, e.foil, targetId)
+                notice.value = "$count × ${e.printedName ?: e.name} nach „${target.label}“ verschoben."
+            }
+            onDone()
+        }
+    }
+
     fun delete(item: EntryWithLocation, onDone: () -> Unit) {
         viewModelScope.launch {
             repository.delete(item.entry.id)

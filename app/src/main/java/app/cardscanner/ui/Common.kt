@@ -51,7 +51,7 @@ fun CardThumb(url: String?, description: String, width: Dp = 48.dp) {
 }
 
 @Composable
-fun QuantityStepper(value: Int, onChange: (Int) -> Unit, min: Int = 0) {
+fun QuantityStepper(value: Int, onChange: (Int) -> Unit, min: Int = 0, max: Int = Int.MAX_VALUE) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         OutlinedButton(onClick = { onChange(value - 1) }, enabled = value > min) { Text("−") }
         Text(
@@ -59,7 +59,7 @@ fun QuantityStepper(value: Int, onChange: (Int) -> Unit, min: Int = 0) {
             style = MaterialTheme.typography.titleLarge,
             modifier = Modifier.padding(horizontal = 16.dp),
         )
-        OutlinedButton(onClick = { onChange(value + 1) }) { Text("+") }
+        OutlinedButton(onClick = { onChange(value + 1) }, enabled = value < max) { Text("+") }
     }
 }
 
