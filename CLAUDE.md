@@ -21,3 +21,5 @@ Android-App (nur Pixel 9, nur privat) zum Scannen von Magic-Karten in einer Hand
 ## Bauen
 
 Android Studio installiert Sven selbst. Gebaut wird per Gradle auf der Kommandozeile, installiert per `adb install` über Wireless-Debugging aufs Pixel 9.
+
+Debug-Builds werden mit `app/debug.keystore` aus dem Repo signiert, damit Builds vom Mac und von Windows einander per `adb install -r` ersetzen können. Den Schlüssel nicht ersetzen, sonst muss die App deinstalliert werden und ihre Daten gehen verloren.

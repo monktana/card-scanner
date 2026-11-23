@@ -15,6 +15,17 @@ android {
         versionName = "0.1-spike"
     }
 
+    // Gemeinsamer Debug-Schlüssel im Repo, damit Builds von Mac und Windows sich gegenseitig
+    // überschreiben können. Nur für Debug-Builds dieser privaten App, nie für einen Store.
+    signingConfigs {
+        getByName("debug") {
+            storeFile = file("debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
