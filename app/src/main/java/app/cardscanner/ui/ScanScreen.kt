@@ -66,7 +66,9 @@ import androidx.lifecycle.LifecycleOwner
 import app.cardscanner.data.CollectionEntry
 import app.cardscanner.data.LocationKind
 import app.cardscanner.data.StorageLocation
+import androidx.compose.material3.LinearProgressIndicator
 import app.cardscanner.scan.ScanController
+import app.cardscanner.scan.ScanPhase
 import app.cardscanner.scan.ScanSession
 
 /** Reiter „Scannen“: Startbildschirm oder laufende Sitzung. */
@@ -148,22 +150,7 @@ private fun ScanSessionScreen(controller: ScanController, session: ScanSession, 
     Column(Modifier.fillMaxSize()) {
         Box(Modifier.fillMaxWidth().weight(1f)) {
             CameraPreview(controller, owner) { camera = it }
-            if (state.notRecognized) {
-                Text(
-                    "Nicht erkannt – beiseitelegen",
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.align(Alignment.TopCenter).fillMaxWidth()
-                        .background(Color(0xCCB71C1C)).padding(12.dp),
-                )
-            }
-            state.lookingUp?.let {
-                Text(
-                    "Suche ${it.setCode} ${it.number} …",
-                    color = Color.White, fontSize = 12.sp,
-                    modifier = Modifier.align(Alignment.BottomStart).background(Color(0x99000000)).padding(6.dp),
-                )
-            }
+            StatusBar(state.phase, Modifier.align(Alignment.TopCenter))
         }
 
         Column(Modifier.fillMaxWidth().background(Color(0xFF121212)).padding(horizontal = 12.dp, vertical = 8.dp)) {
@@ -234,6 +221,37 @@ private fun ScanSessionScreen(controller: ScanController, session: ScanSession, 
             },
             dismissButton = { TextButton(onClick = { confirmFinish = false }) { Text("Weiter scannen") } },
         )
+    }
+}
+
+/** Zeigt immer, was der Scanner gerade tut. */
+@Composable
+private fun StatusBar(phase: ScanPhase, modifier: Modifier = Modifier) {
+    val (text, color) = when (phase) {
+        ScanPhase.Waiting -> "Bereit – Karte auflegen" to Color(0xCC424242)
+        is ScanPhase.Reading -> "Lese Karte …" to Color(0xCC1565C0)
+        is ScanPhase.Checking -> "Erkannt: ${phase.key.setCode} ${phase.key.number} – prüfe …" to Color(0xCCEF6C00)
+        is ScanPhase.Counted -> "✓ ${phase.name} gezählt – nächste Karte auflegen" to Color(0xCC2E7D32)
+        ScanPhase.NotRecognized -> "Nicht erkannt – beiseitelegen" to Color(0xCCB71C1C)
+        is ScanPhase.Problem -> phase.message to Color(0xCCB71C1C)
+    }
+    Column(modifier.fillMaxWidth().background(color)) {
+        Text(
+            text,
+            color = Color.White,
+            fontWeight = FontWeight.Bold,
+            maxLines = 2,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+        )
+        when (phase) {
+            is ScanPhase.Reading -> LinearProgressIndicator(progress = { phase.progress }, modifier = Modifier.fillMaxWidth())
+            is ScanPhase.Counted -> Text(
+                "Weiteres Exemplar derselben Karte: kurz wegnehmen und neu auflegen",
+                color = Color.White, fontSize = 12.sp,
+                modifier = Modifier.padding(start = 12.dp, end = 12.dp, bottom = 8.dp),
+            )
+            else -> {}
+        }
     }
 }
 

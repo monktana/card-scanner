@@ -39,6 +39,15 @@ class SpikeLog(private val dir: File) {
         hits.appendText(row + "\n")
     }
 
+    private val events = File(dir, "events.csv")
+
+    /** Protokolliert jeden Wechsel des Scan-Status, um Hänger nachvollziehen zu können. */
+    @Synchronized
+    fun appendEvent(phase: String, lines: Int, parsed: String?) {
+        if (!events.exists()) events.writeText("zeit;status;zeilen;gelesen\n")
+        events.appendText("${LocalDateTime.now()};$phase;$lines;${parsed ?: ""}\n")
+    }
+
     /** Speichert Kamerabild und OCR-Text einer Karte, die nicht erkannt wurde. */
     fun saveCapture(bitmap: Bitmap, rotationDegrees: Int, lines: List<String>): String {
         val name = "nicht-erkannt-" + LocalDateTime.now().format(stamp)

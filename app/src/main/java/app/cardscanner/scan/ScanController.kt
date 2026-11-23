@@ -32,21 +32,28 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.concurrent.Executors
 
+/** Was der Scanner gerade tut; wird immer angezeigt, damit nie unklar ist, ob die App hängt. */
+sealed interface ScanPhase {
+    data object Waiting : ScanPhase
+    /** Karte liegt da, Set und Nummer noch nicht sicher gelesen; [progress] bis „nicht erkannt“. */
+    data class Reading(val progress: Float) : ScanPhase
+    data class Checking(val key: CollectorKey) : ScanPhase
+    data class Counted(val name: String) : ScanPhase
+    data object NotRecognized : ScanPhase
+    data class Problem(val message: String) : ScanPhase
+}
+
 data class ScanUiState(
     val session: ScanSession? = null,
+    val phase: ScanPhase = ScanPhase.Waiting,
     val parsed: ParsedCollectorLine? = null,
     val rawLines: List<String> = emptyList(),
     val ocrMs: Long = 0,
-    val lookingUp: CollectorKey? = null,
-    /** Eine Karte liegt seit [MISS_AFTER_MS] da, ohne dass Set und Nummer gelesen wurden. */
-    val notRecognized: Boolean = false,
     val message: String? = null,
 )
 
 /**
- * Dauerscan: Live-OCR → Parser → Scryfall → Sammlung. Eine Druckversion wird abgefragt, sobald
- * sie in [STABLE_FRAMES] Bildern hintereinander gelesen wurde. Dieselbe Druckversion zählt erst
- * wieder, wenn zwischendurch [EMPTY_FRAMES] Bilder ohne Treffer kamen („Karte weg“).
+ * Dauerscan: Live-OCR → Parser → [ScanTracker] → Scryfall → Sammlung.
  *
  * Alle Änderungen an Sitzung und Sammlung laufen über [scope] (Main-Thread).
  */
@@ -69,13 +76,7 @@ class ScanController(
     @Volatile private var setCatalog: SetCatalog? = null
 
     // Nur im analysisExecutor verwendet.
-    private var currentKey: CollectorKey? = null
-    private var sameCount = 0
-    private var emptyCount = 0
-    private var lastCounted: CollectorKey? = null
-    private var firstSeenAt = 0L
-    private var unrecognizedSince = 0L
-    private var missSignaled = false
+    private val tracker = ScanTracker(onLookup = ::lookup, onMiss = { feedback.miss() })
 
     @Volatile private var captureRequested = false
 
@@ -96,9 +97,9 @@ class ScanController(
         scope.launch {
             val locationId = repository.resolve(location)
             val before = if (replaceDeck && locationId != null) repository.quantitiesIn(locationId) else emptyMap()
-            analysisExecutor.execute { lastCounted = null }
+            analysisExecutor.execute { tracker.reset() }
             setSession(ScanSession(locationId, location.label, foil, replaceDeck, before))
-            _state.update { it.copy(message = null, notRecognized = false) }
+            _state.update { it.copy(message = null, phase = ScanPhase.Waiting) }
         }
     }
 
@@ -182,46 +183,17 @@ class ScanController(
         }
     }
 
+
     private fun onLines(lines: List<String>, ocrMs: Long) {
         val parsed = CollectorLineParser.parse(lines, ::resolveSet)
-        val key = parsed?.key
         _state.update { it.copy(rawLines = lines, parsed = parsed, ocrMs = ocrMs) }
-        trackUnrecognized(lines, parsed)
-
-        if (key == null) {
-            if (++emptyCount >= EMPTY_FRAMES) lastCounted = null
-            currentKey = null
-            sameCount = 0
-            return
-        }
-        emptyCount = 0
-        if (key != currentKey) {
-            currentKey = key
-            sameCount = 0
-            firstSeenAt = SystemClock.elapsedRealtime()
-        }
-        if (++sameCount == STABLE_FRAMES && key != lastCounted) {
-            lastCounted = key
-            lookup(parsed, firstSeenAt)
-        }
+        setPhase(tracker.onFrame(lines.size, parsed, SystemClock.elapsedRealtime()), lines.size, parsed?.key)
     }
 
-    /** Signal, wenn eine Karte (viel Text) länger daliegt, ohne dass Set und Nummer gelesen werden. */
-    private fun trackUnrecognized(lines: List<String>, parsed: ParsedCollectorLine?) {
-        val cardPresent = lines.size >= MIN_CARD_LINES
-        if (parsed != null || !cardPresent) {
-            unrecognizedSince = 0
-            missSignaled = false
-            if (_state.value.notRecognized) _state.update { it.copy(notRecognized = false) }
-            return
-        }
-        val now = SystemClock.elapsedRealtime()
-        if (unrecognizedSince == 0L) unrecognizedSince = now
-        if (!missSignaled && now - unrecognizedSince >= MISS_AFTER_MS) {
-            missSignaled = true
-            feedback.miss()
-            _state.update { it.copy(notRecognized = true) }
-        }
+    private fun setPhase(phase: ScanPhase, lines: Int, key: CollectorKey?) {
+        val old = _state.value.phase
+        if (old::class != phase::class) diagnostics.appendEvent(phase.javaClass.simpleName, lines, key?.let { "${it.setCode} ${it.number}" })
+        if (old != phase) _state.update { it.copy(phase = phase) }
     }
 
     private fun resolveSet(raw: String): String? {
@@ -231,31 +203,31 @@ class ScanController(
 
     private fun lookup(parsed: ParsedCollectorLine, firstSeenAt: Long) {
         scope.launch {
-            _state.update { it.copy(lookingUp = parsed.key) }
             val t0 = SystemClock.elapsedRealtime()
             val result = scryfall.find(parsed)
             val now = SystemClock.elapsedRealtime()
             withContext(Dispatchers.IO) { diagnostics.appendHit(parsed, result, now - firstSeenAt, now - t0) }
-            _state.update { it.copy(lookingUp = null) }
 
             val session = _state.value.session ?: return@launch
-            when (result) {
+            val outcome = when (result) {
                 is LookupResult.Found -> {
                     val entryId = repository.addCopies(result.card, session.foil, session.locationId)
                     updateSession { it.withScan(entryId, 1) }
                     feedback.hit()
-                    message(null)
+                    ScanPhase.Counted(result.card.printedName ?: result.card.name)
                 }
                 LookupResult.NotFound -> {
                     feedback.miss()
-                    message("Nicht bei Scryfall: ${parsed.setCode} ${parsed.number}")
+                    ScanPhase.Problem("${parsed.setCode} ${parsed.number} gibt es bei Scryfall nicht – beiseitelegen")
                 }
                 is LookupResult.Failed -> {
                     feedback.miss()
-                    message("Scryfall-Fehler: ${result.message}")
-                    // Nochmal versuchen, sobald die Karte erneut erkannt wird.
-                    analysisExecutor.execute { if (lastCounted == parsed.key) lastCounted = null }
+                    ScanPhase.Problem("Scryfall nicht erreichbar (${result.message}) – Karte neu auflegen")
                 }
+            }
+            // Nur anzeigen, wenn noch dieselbe Karte liegt; sonst ist der Scanner schon weiter.
+            analysisExecutor.execute {
+                tracker.onOutcome(parsed.key, outcome)?.let { setPhase(it, 0, parsed.key) }
             }
         }
     }
@@ -264,12 +236,5 @@ class ScanController(
         recognizer.close()
         analysisExecutor.shutdown()
         feedback.release()
-    }
-
-    private companion object {
-        const val STABLE_FRAMES = 2
-        const val EMPTY_FRAMES = 3
-        const val MIN_CARD_LINES = 4
-        const val MISS_AFTER_MS = 3_000L
     }
 }
