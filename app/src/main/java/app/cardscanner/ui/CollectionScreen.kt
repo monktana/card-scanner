@@ -49,13 +49,24 @@ fun CollectionScreen(viewModel: CollectionViewModel, onAddManually: () -> Unit) 
 
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize()) {
-            OutlinedTextField(
-                value = query,
-                onValueChange = { viewModel.query.value = it },
-                placeholder = { Text("Suchen: Name, Set, Lagerort") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth().padding(12.dp),
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = { viewModel.query.value = it },
+                    placeholder = { Text("Suchen: Name, Set, Lagerort") },
+                    singleLine = true,
+                    modifier = Modifier.weight(1f).padding(start = 12.dp, top = 12.dp, bottom = 12.dp),
+                )
+                CollectionMenu(viewModel)
+            }
+            val notice by viewModel.notice.collectAsState()
+            notice?.let {
+                Text(
+                    it,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.fillMaxWidth().clickable { viewModel.notice.value = null }.padding(horizontal = 16.dp, vertical = 4.dp),
+                )
+            }
             Text(
                 "${entries.sumOf { it.entry.quantity }} Karten · ${entries.size} Einträge",
                 style = MaterialTheme.typography.labelMedium,

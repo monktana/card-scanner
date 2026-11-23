@@ -31,6 +31,12 @@ interface CollectionDao {
     @Query("SELECT * FROM entries WHERE scryfallId = :scryfallId AND foil = :foil AND locationId IS :locationId LIMIT 1")
     suspend fun findSame(scryfallId: String, foil: Boolean, locationId: Long?): CollectionEntry?
 
+    @Query("SELECT * FROM entries")
+    suspend fun allEntries(): List<CollectionEntry>
+
+    @Query("DELETE FROM entries")
+    suspend fun deleteAllEntries()
+
     @Insert
     suspend fun insert(entry: CollectionEntry): Long
 

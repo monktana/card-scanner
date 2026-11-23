@@ -151,6 +151,42 @@ class CollectionRepositoryTest {
         assertEquals(1, entries().single().quantity)
     }
 
+    @Test
+    fun exportUndImportStellenDieSammlungWiederHer() = runTest {
+        val deck = repo.location(LocationKind.DECK, "vivi-ornitier")
+        repo.addCopies(boltDe, foil = true, locationId = deck.id, count = 2)
+        repo.addCopies(boltEn, foil = false, locationId = null)
+        val csv = CollectionExport.csv(repo.entries.first())
+
+        // Neue, leere Datenbank wie nach einer Neuinstallation.
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val fresh = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java).build()
+        try {
+            val restored = CollectionRepository(fresh) { 2000L }
+            assertEquals(3, restored.import(CollectionExport.parseCsv(csv), replace = true))
+            val all = restored.entries.first()
+            val inDeck = all.single { it.location != null }
+            assertEquals("vivi-ornitier", inDeck.location!!.name)
+            assertEquals(LocationKind.DECK, inDeck.location!!.kind)
+            assertEquals(2, inDeck.entry.quantity)
+            assertTrue(inDeck.entry.foil)
+            assertEquals("Blitzschlag", inDeck.entry.printedName)
+            assertEquals(1, all.single { it.location == null }.entry.quantity)
+        } finally {
+            fresh.close()
+        }
+    }
+
+    @Test
+    fun importErgaenztOderErsetzt() = runTest {
+        repo.addCopies(boltEn, foil = false, locationId = null)
+        val rows = CollectionExport.parseCsv(CollectionExport.csv(repo.entries.first()))
+        repo.import(rows, replace = false)
+        assertEquals(2, entries().single().quantity)
+        repo.import(rows, replace = true)
+        assertEquals(1, entries().single().quantity)
+    }
+
     private fun card(id: String, lang: String, printedName: String? = null, name: String = "Lightning Bolt") = ScryfallCard(
         id = id, oracleId = id, name = name, printedName = printedName,
         setCode = "m11", setName = "Magic 2011", collectorNumber = "149", lang = lang, imageUrl = null,

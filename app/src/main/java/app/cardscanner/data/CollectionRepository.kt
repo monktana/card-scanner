@@ -135,6 +135,41 @@ class CollectionRepository(
         if (left <= 0) dao.delete(entry) else dao.update(entry.copy(quantity = left, updatedAt = now))
     }
 
+    suspend fun entryCount(): Int = dao.allEntries().size
+
+    /**
+     * Übernimmt eine importierte CSV. [replace] löscht vorher alle Einträge (z. B. Wiederherstellen
+     * nach Neuinstallation); sonst werden gleiche Einträge zusammengeführt. Alles oder nichts.
+     * Gibt die Zahl der importierten Karten zurück.
+     */
+    suspend fun import(rows: List<CollectionExport.ImportRow>, replace: Boolean): Int = db.withTransaction {
+        if (replace) dao.deleteAllEntries()
+        val now = clock()
+        val locations = mutableMapOf<Pair<LocationKind, String>, Long>()
+        for (row in rows) {
+            val locationId = if (row.locationKind != null && row.locationName != null) {
+                locations.getOrPut(row.locationKind to row.locationName) { location(row.locationKind, row.locationName).id }
+            } else {
+                null
+            }
+            val same = dao.findSame(row.scryfallId, row.foil, locationId)
+            if (same != null) {
+                dao.update(same.copy(quantity = same.quantity + row.quantity, updatedAt = now))
+            } else {
+                dao.insert(
+                    CollectionEntry(
+                        scryfallId = row.scryfallId, oracleId = row.oracleId, name = row.name,
+                        printedName = row.printedName, setCode = row.setCode, setName = row.setName,
+                        collectorNumber = row.collectorNumber, lang = row.lang, imageUrl = row.imageUrl,
+                        foil = row.foil, locationId = locationId, quantity = row.quantity,
+                        addedAt = now, updatedAt = now,
+                    ),
+                )
+            }
+        }
+        rows.sumOf { it.quantity }
+    }
+
     suspend fun delete(entryId: Long) = db.withTransaction {
         dao.entry(entryId)?.let { dao.delete(it) }
     }

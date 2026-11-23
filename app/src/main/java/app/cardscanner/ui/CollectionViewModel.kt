@@ -3,8 +3,14 @@ package app.cardscanner.ui
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.cardscanner.ScryfallClient
+import app.cardscanner.data.CollectionExport
 import app.cardscanner.data.CollectionRepository
 import app.cardscanner.data.EntryWithLocation
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withContext
+import java.io.File
+import java.time.LocalDate
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -60,6 +66,48 @@ class CollectionViewModel(
         viewModelScope.launch {
             repository.delete(item.entry.id)
             onDone()
+        }
+    }
+
+    // --- Export / Import ---------------------------------------------------------------
+
+    /** Meldung nach Export oder Import. */
+    val notice = MutableStateFlow<String?>(null)
+
+    data class PendingImport(val rows: List<CollectionExport.ImportRow>, val existingEntries: Int)
+
+    /** CSV gelesen, wartet auf „Ersetzen“ oder „Ergänzen“. */
+    val pendingImport = MutableStateFlow<PendingImport?>(null)
+
+    /** Schreibt sammlung.txt und sammlung.csv nach [dir] und gibt beide Dateien zurück. */
+    suspend fun writeExport(dir: File): List<File> {
+        val all = repository.entries.first()
+        return withContext(Dispatchers.IO) {
+            dir.mkdirs()
+            listOf(
+                File(dir, "sammlung.txt").apply { writeText(CollectionExport.namesFile(all, LocalDate.now())) },
+                File(dir, "sammlung.csv").apply { writeText(CollectionExport.csv(all)) },
+            )
+        }
+    }
+
+    fun readImport(text: String) {
+        viewModelScope.launch {
+            try {
+                val rows = withContext(Dispatchers.Default) { CollectionExport.parseCsv(text) }
+                pendingImport.value = PendingImport(rows, repository.entryCount())
+            } catch (e: CollectionExport.ImportException) {
+                notice.value = "Import abgebrochen: ${e.message}"
+            }
+        }
+    }
+
+    fun confirmImport(replace: Boolean) {
+        val pending = pendingImport.value ?: return
+        pendingImport.value = null
+        viewModelScope.launch {
+            val count = repository.import(pending.rows, replace)
+            notice.value = "$count Karten importiert" + if (replace) " (Sammlung ersetzt)." else " (ergänzt)."
         }
     }
 
