@@ -25,7 +25,8 @@ Android-App (nur Pixel 9, nur privat) zum Scannen von Magic-Karten in einer Hand
 - **Export:** Feste Dateinamen `sammlung.txt` und `sammlung.csv`, beide zusammen über das Teilen-Menü. Die Gruppen heißen `#! Deck: <name>`, `#! Bulk: <name>` und `#! Ohne Lagerort`. Die CSV hat die zusätzliche Spalte `art`.
 - **Diagnose-Ansicht** (ausgeblendet, langes Drücken auf den Lagerort-Namen in der laufenden Scan-Sitzung): Rohtext, „Nicht erkannt: Bild speichern“, `treffer.csv`. Werkzeug zum Verbessern des Parsers.
 
-- **Scan-Sitzung:** Startbildschirm (Lagerort, Foil-Modus, bei vorhandenem Deck Ergänzen/Ersetzen), dann erst die Kamera. Jeder Treffer wird sofort gespeichert. Die Sitzung liegt in `session.json` und übersteht einen Neustart der App. „Nicht erkannt“ kommt nach 3 s mit Text (mindestens 4 Zeilen) ohne Set und Nummer.
+- **Scan-Sitzung:** Startbildschirm (Lagerort, Foil-Modus, bei vorhandenem Deck Ergänzen/Ersetzen), dann erst die Kamera. Jeder Treffer wird sofort gespeichert. Die Sitzung liegt in `session.json` und übersteht einen Neustart der App. „Nicht erkannt“ kommt nach 3 s mit Text (mindestens 4 Zeilen) ohne Set und Nummer. Eine Statusleiste über der Kamera zeigt immer, was der Scanner tut.
+- **Gleiche Karte hintereinander:** Sven schiebt Karten in der Halterung auf einen Stapel, das Fach ist erst leer, wenn er den Stapel entnimmt. Dieselbe Druckversion zählt automatisch erst nach leerem Fach erneut. Für eine nachgeschobene gleiche Karte gibt es „+1“ in der grünen Statusleiste. Bewusst keine Bewegungserkennung, weil sie unbemerkt doppelt zählen könnte.
 
 ## Reihenfolge
 

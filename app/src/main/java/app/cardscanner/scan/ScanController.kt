@@ -38,7 +38,8 @@ sealed interface ScanPhase {
     /** Karte liegt da, Set und Nummer noch nicht sicher gelesen; [progress] bis „nicht erkannt“. */
     data class Reading(val progress: Float) : ScanPhase
     data class Checking(val key: CollectorKey) : ScanPhase
-    data class Counted(val name: String) : ScanPhase
+    /** [entryId]: Eintrag, in den gezählt wurde; für „+1“ bei gleichen Karten hintereinander. */
+    data class Counted(val name: String, val entryId: Long? = null) : ScanPhase
     data object NotRecognized : ScanPhase
     data class Problem(val message: String) : ScanPhase
 }
@@ -214,7 +215,7 @@ class ScanController(
                     val entryId = repository.addCopies(result.card, session.foil, session.locationId)
                     updateSession { it.withScan(entryId, 1) }
                     feedback.hit()
-                    ScanPhase.Counted(result.card.printedName ?: result.card.name)
+                    ScanPhase.Counted(result.card.printedName ?: result.card.name, entryId)
                 }
                 LookupResult.NotFound -> {
                     feedback.miss()

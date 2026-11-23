@@ -150,7 +150,12 @@ private fun ScanSessionScreen(controller: ScanController, session: ScanSession, 
     Column(Modifier.fillMaxSize()) {
         Box(Modifier.fillMaxWidth().weight(1f)) {
             CameraPreview(controller, owner) { camera = it }
-            StatusBar(state.phase, Modifier.align(Alignment.TopCenter))
+            StatusBar(
+                phase = state.phase,
+                session = session,
+                onPlusOne = { controller.increment(it) },
+                modifier = Modifier.align(Alignment.TopCenter),
+            )
         }
 
         Column(Modifier.fillMaxWidth().background(Color(0xFF121212)).padding(horizontal = 12.dp, vertical = 8.dp)) {
@@ -226,31 +231,40 @@ private fun ScanSessionScreen(controller: ScanController, session: ScanSession, 
 
 /** Zeigt immer, was der Scanner gerade tut. */
 @Composable
-private fun StatusBar(phase: ScanPhase, modifier: Modifier = Modifier) {
+private fun StatusBar(
+    phase: ScanPhase,
+    session: ScanSession,
+    onPlusOne: (entryId: Long) -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val (text, color) = when (phase) {
         ScanPhase.Waiting -> "Bereit – Karte auflegen" to Color(0xCC424242)
         is ScanPhase.Reading -> "Lese Karte …" to Color(0xCC1565C0)
         is ScanPhase.Checking -> "Erkannt: ${phase.key.setCode} ${phase.key.number} – prüfe …" to Color(0xCCEF6C00)
-        is ScanPhase.Counted -> "✓ ${phase.name} gezählt – nächste Karte auflegen" to Color(0xCC2E7D32)
+        is ScanPhase.Counted -> "✓ ${phase.name}" to Color(0xCC2E7D32)
         ScanPhase.NotRecognized -> "Nicht erkannt – beiseitelegen" to Color(0xCCB71C1C)
         is ScanPhase.Problem -> phase.message to Color(0xCCB71C1C)
     }
+    // Nach einem Verwerfen oder Foil-Umschalten gehört der Eintrag nicht mehr zur Sitzung.
+    val counted = (phase as? ScanPhase.Counted)?.entryId?.takeIf { it in session.scanned }
+
     Column(modifier.fillMaxWidth().background(color)) {
-        Text(
-            text,
-            color = Color.White,
-            fontWeight = FontWeight.Bold,
-            maxLines = 2,
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-        )
-        when (phase) {
-            is ScanPhase.Reading -> LinearProgressIndicator(progress = { phase.progress }, modifier = Modifier.fillMaxWidth())
-            is ScanPhase.Counted -> Text(
-                "Weiteres Exemplar derselben Karte: kurz wegnehmen und neu auflegen",
-                color = Color.White, fontSize = 12.sp,
-                modifier = Modifier.padding(start = 12.dp, end = 12.dp, bottom = 8.dp),
-            )
-            else -> {}
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f).padding(horizontal = 12.dp, vertical = 10.dp)) {
+                Text(text, color = Color.White, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                if (counted != null) {
+                    Text(
+                        "${session.scanned[counted]} in dieser Sitzung · gleiche Karte nachgeschoben? +1",
+                        color = Color.White, fontSize = 12.sp,
+                    )
+                }
+            }
+            if (counted != null) {
+                Button(onClick = { onPlusOne(counted) }, modifier = Modifier.padding(end = 8.dp)) { Text("+1") }
+            }
+        }
+        if (phase is ScanPhase.Reading) {
+            LinearProgressIndicator(progress = { phase.progress }, modifier = Modifier.fillMaxWidth())
         }
     }
 }
