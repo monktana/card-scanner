@@ -54,4 +54,23 @@ interface CollectionDao {
 
     @Insert
     suspend fun insertLocation(location: StorageLocation): Long
+
+    @Query(
+        """
+        SELECT l.*, COUNT(e.id) AS entryCount, COALESCE(SUM(e.quantity), 0) AS cardCount
+        FROM locations l LEFT JOIN entries e ON e.locationId = l.id
+        GROUP BY l.id
+        ORDER BY l.kind, l.name COLLATE NOCASE
+        """,
+    )
+    fun observeLocationStats(): Flow<List<LocationStats>>
+
+    @Query("SELECT * FROM locations WHERE id = :id")
+    suspend fun locationById(id: Long): StorageLocation?
+
+    @Update
+    suspend fun updateLocation(location: StorageLocation)
+
+    @Delete
+    suspend fun deleteLocation(location: StorageLocation)
 }

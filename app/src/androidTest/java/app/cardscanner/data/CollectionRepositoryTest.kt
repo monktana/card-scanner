@@ -178,6 +178,55 @@ class CollectionRepositoryTest {
     }
 
     @Test
+    fun lagerortUmbenennenUndArtAendern() = runTest {
+        val box = repo.location(LocationKind.BULK, "Box1")
+        repo.addCopies(boltEn, foil = false, locationId = box.id)
+        assertEquals(CollectionRepository.RenameResult.Done, repo.renameLocation(box.id, LocationKind.DECK, " zwerge "))
+        val stats = repo.locationStats.first().single()
+        assertEquals(StorageLocation(box.id, LocationKind.DECK, "zwerge"), stats.location)
+        assertEquals(1, stats.cardCount)
+    }
+
+    @Test
+    fun umbenennenAufVorhandenenNamenFuehrtNachRueckfrageZusammen() = runTest {
+        val typo = repo.location(LocationKind.BULK, "Box1")
+        val box = repo.location(LocationKind.BULK, "Box 1")
+        repo.addCopies(boltEn, foil = false, locationId = typo.id, count = 2)
+        repo.addCopies(boltEn, foil = false, locationId = box.id)
+        repo.addCopies(boltDe, foil = false, locationId = typo.id)
+
+        val conflict = repo.renameLocation(typo.id, LocationKind.BULK, "Box 1")
+        assertEquals(CollectionRepository.RenameResult.Conflict(box), conflict)
+        assertEquals(2, repo.locationStats.first().size) // ohne merge passiert nichts
+
+        repo.renameLocation(typo.id, LocationKind.BULK, "Box 1", merge = true)
+        val stats = repo.locationStats.first().single()
+        assertEquals(box.id, stats.location.id)
+        assertEquals(2, stats.entryCount)
+        assertEquals(4, stats.cardCount)
+    }
+
+    @Test
+    fun lagerortLoeschenVerschiebtKarten() = runTest {
+        val deck = repo.location(LocationKind.DECK, "alt")
+        val box = repo.location(LocationKind.BULK, "Box 1")
+        repo.addCopies(boltEn, foil = false, locationId = deck.id, count = 2)
+        repo.addCopies(boltEn, foil = false, locationId = box.id)
+        repo.addCopies(boltDe, foil = true, locationId = deck.id)
+
+        repo.deleteLocation(deck.id, targetLocationId = box.id)
+        val stats = repo.locationStats.first().single()
+        assertEquals(box.id, stats.location.id)
+        assertEquals(2, stats.entryCount)
+        assertEquals(4, stats.cardCount)
+
+        repo.deleteLocation(box.id, targetLocationId = null)
+        assertTrue(repo.locationStats.first().isEmpty())
+        assertEquals(4, entries().sumOf { it.quantity })
+        assertTrue(entries().all { it.locationId == null })
+    }
+
+    @Test
     fun mehrereEintraegeLoeschen() = runTest {
         val a = repo.addCopies(boltEn, foil = false, locationId = null, count = 3)
         val b = repo.addCopies(boltEn, foil = true, locationId = null)

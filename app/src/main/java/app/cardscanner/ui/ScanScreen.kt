@@ -79,7 +79,9 @@ fun ScanTab(controller: ScanController, locations: List<StorageLocation>, owner:
     if (session == null) {
         SessionStartScreen(locations) { location, foil, replace -> controller.start(location, foil, replace) }
     } else {
-        PermissionGate { ScanSessionScreen(controller, session, owner) }
+        // Wurde der Lagerort inzwischen umbenannt, den aktuellen Namen zeigen.
+        val label = locations.find { it.id == session.locationId }?.label ?: session.locationLabel
+        PermissionGate { ScanSessionScreen(controller, session.copy(locationLabel = label), owner) }
     }
 }
 

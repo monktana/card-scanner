@@ -48,7 +48,7 @@ import app.cardscanner.data.EntryWithLocation
 import app.cardscanner.data.StorageLocation
 
 @Composable
-fun CollectionScreen(viewModel: CollectionViewModel, onAddManually: () -> Unit) {
+fun CollectionScreen(viewModel: CollectionViewModel, onAddManually: () -> Unit, onManageLocations: () -> Unit) {
     val entries by viewModel.entries.collectAsState()
     val locations by viewModel.locations.collectAsState()
     val query by viewModel.query.collectAsState()
@@ -77,7 +77,7 @@ fun CollectionScreen(viewModel: CollectionViewModel, onAddManually: () -> Unit) 
                         singleLine = true,
                         modifier = Modifier.weight(1f).padding(start = 12.dp, top = 12.dp, bottom = 12.dp),
                     )
-                    CollectionMenu(viewModel)
+                    CollectionMenu(viewModel, onManageLocations)
                 }
             }
             val notice by viewModel.notice.collectAsState()

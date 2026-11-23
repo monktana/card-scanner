@@ -30,7 +30,7 @@ import java.io.File
 
 /** Menü der Sammlung: Export über das Teilen-Menü, Import einer CSV. */
 @Composable
-fun CollectionMenu(viewModel: CollectionViewModel) {
+fun CollectionMenu(viewModel: CollectionViewModel, onManageLocations: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var open by remember { mutableStateOf(false) }
@@ -49,6 +49,13 @@ fun CollectionMenu(viewModel: CollectionViewModel) {
     Box {
         IconButton(onClick = { open = true }) { Icon(Icons.Filled.MoreVert, contentDescription = "Menü") }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            DropdownMenuItem(
+                text = { Text("Lagerorte verwalten") },
+                onClick = {
+                    open = false
+                    onManageLocations()
+                },
+            )
             DropdownMenuItem(
                 text = { Text("Exportieren (teilen)") },
                 onClick = {

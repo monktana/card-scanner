@@ -6,6 +6,8 @@ import app.cardscanner.ScryfallClient
 import app.cardscanner.data.CollectionExport
 import app.cardscanner.data.CollectionRepository
 import app.cardscanner.data.EntryWithLocation
+import app.cardscanner.data.LocationKind
+import app.cardscanner.data.StorageLocation
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
@@ -65,6 +67,41 @@ class CollectionViewModel(
     fun delete(item: EntryWithLocation, onDone: () -> Unit) {
         viewModelScope.launch {
             repository.delete(item.entry.id)
+            onDone()
+        }
+    }
+
+    // --- Lagerorte verwalten -------------------------------------------------------------
+
+    val locationStats = repository.locationStats
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    fun createLocation(kind: LocationKind, name: String) {
+        if (name.isBlank()) return
+        viewModelScope.launch { repository.location(kind, name) }
+    }
+
+    /** Benennt um; gibt es den Namen schon, kommt [onConflict], erst mit merge = true wird zusammengeführt. */
+    fun renameLocation(
+        id: Long,
+        kind: LocationKind,
+        name: String,
+        merge: Boolean,
+        onConflict: (StorageLocation) -> Unit,
+        onDone: () -> Unit,
+    ) {
+        if (name.isBlank()) return
+        viewModelScope.launch {
+            when (val result = repository.renameLocation(id, kind, name, merge)) {
+                CollectionRepository.RenameResult.Done -> onDone()
+                is CollectionRepository.RenameResult.Conflict -> onConflict(result.existing)
+            }
+        }
+    }
+
+    fun deleteLocation(id: Long, target: StorageLocation?, onDone: () -> Unit) {
+        viewModelScope.launch {
+            repository.deleteLocation(id, target?.id)
             onDone()
         }
     }

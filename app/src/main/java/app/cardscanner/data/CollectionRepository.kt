@@ -179,6 +179,58 @@ class CollectionRepository(
         dao.entry(entryId)?.let { dao.delete(it) }
     }
 
+    val locationStats: Flow<List<LocationStats>> = dao.observeLocationStats()
+
+    sealed interface RenameResult {
+        data object Done : RenameResult
+        /** Es gibt schon einen Lagerort mit Art und Name; mit merge = true zusammenführen. */
+        data class Conflict(val existing: StorageLocation) : RenameResult
+    }
+
+    /** Benennt einen Lagerort um oder ändert seine Art. Kollidiert das mit einem anderen, wird nur bei [merge] zusammengeführt. */
+    suspend fun renameLocation(id: Long, kind: LocationKind, name: String, merge: Boolean = false): RenameResult {
+        val trimmed = name.trim()
+        require(trimmed.isNotEmpty())
+        return db.withTransaction {
+            val location = dao.locationById(id) ?: return@withTransaction RenameResult.Done
+            val other = dao.findLocation(kind, trimmed)?.takeIf { it.id != id }
+            when {
+                other == null -> {
+                    dao.updateLocation(location.copy(kind = kind, name = trimmed))
+                    RenameResult.Done
+                }
+                !merge -> RenameResult.Conflict(other)
+                else -> {
+                    moveAllEntries(fromLocationId = id, toLocationId = other.id)
+                    dao.deleteLocation(location)
+                    RenameResult.Done
+                }
+            }
+        }
+    }
+
+    /** Löscht einen Lagerort; seine Karten wandern nach [targetLocationId] (null = ohne Lagerort). */
+    suspend fun deleteLocation(id: Long, targetLocationId: Long?) = db.withTransaction {
+        val location = dao.locationById(id) ?: return@withTransaction
+        require(targetLocationId != id)
+        moveAllEntries(fromLocationId = id, toLocationId = targetLocationId)
+        dao.deleteLocation(location)
+    }
+
+    /** Verschiebt alle Einträge eines Lagerorts; gleiche Einträge im Ziel werden addiert. */
+    private suspend fun moveAllEntries(fromLocationId: Long, toLocationId: Long?) {
+        val now = clock()
+        for (entry in dao.entriesIn(fromLocationId)) {
+            val same = dao.findSame(entry.scryfallId, entry.foil, toLocationId)
+            if (same != null) {
+                dao.update(same.copy(quantity = same.quantity + entry.quantity, updatedAt = now))
+                dao.delete(entry)
+            } else {
+                dao.update(entry.copy(locationId = toLocationId, updatedAt = now))
+            }
+        }
+    }
+
     /** Lagerort zu Art und Name; wird bei Bedarf angelegt. */
     suspend fun location(kind: LocationKind, name: String): StorageLocation {
         val trimmed = name.trim()

@@ -59,6 +59,13 @@ data class CollectionEntry(
     val updatedAt: Long,
 )
 
+/** Lagerort mit der Zahl seiner Einträge und Karten, für die Verwaltung. */
+data class LocationStats(
+    @Embedded val location: StorageLocation,
+    val entryCount: Int,
+    val cardCount: Int,
+)
+
 data class EntryWithLocation(
     @Embedded val entry: CollectionEntry,
     @Relation(parentColumn = "locationId", entityColumn = "id")

@@ -32,6 +32,7 @@ import app.cardscanner.scan.ScanController
 import app.cardscanner.ui.CollectionScreen
 import app.cardscanner.ui.ScanTab
 import app.cardscanner.ui.CollectionViewModel
+import app.cardscanner.ui.LocationsScreen
 import app.cardscanner.ui.ManualSearchScreen
 import app.cardscanner.ui.SearchViewModel
 
@@ -54,10 +55,12 @@ class MainActivity : ComponentActivity() {
             MaterialTheme(colorScheme = darkColorScheme()) {
                 val collectionViewModel: CollectionViewModel = viewModel(factory = factory)
                 val locations by collectionViewModel.locations.collectAsState()
+                val scanState by controller.state.collectAsState()
                 AppRoot(
                     scan = { ScanTab(controller, locations, this@MainActivity) },
                     collectionViewModel = collectionViewModel,
                     searchViewModel = viewModel(factory = factory),
+                    activeSessionLocationId = scanState.session?.locationId,
                 )
             }
         }
@@ -76,13 +79,15 @@ private fun AppRoot(
     scan: @Composable () -> Unit,
     collectionViewModel: CollectionViewModel,
     searchViewModel: SearchViewModel,
+    activeSessionLocationId: Long?,
 ) {
     var tab by rememberSaveable { mutableStateOf(Tab.SCAN) }
     var searching by rememberSaveable { mutableStateOf(false) }
+    var managingLocations by rememberSaveable { mutableStateOf(false) }
 
     Scaffold(
         bottomBar = {
-            if (!searching) {
+            if (!searching && !managingLocations) {
                 NavigationBar {
                     Tab.entries.forEach { t ->
                         NavigationBarItem(
@@ -99,8 +104,17 @@ private fun AppRoot(
         Box(Modifier.fillMaxSize().padding(padding)) {
             when {
                 searching -> ManualSearchScreen(searchViewModel, onClose = { searching = false })
+                managingLocations -> LocationsScreen(
+                    collectionViewModel,
+                    activeSessionLocationId,
+                    onClose = { managingLocations = false },
+                )
                 tab == Tab.SCAN -> scan()
-                else -> CollectionScreen(collectionViewModel, onAddManually = { searching = true })
+                else -> CollectionScreen(
+                    collectionViewModel,
+                    onAddManually = { searching = true },
+                    onManageLocations = { managingLocations = true },
+                )
             }
         }
     }
