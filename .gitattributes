@@ -1,0 +1,13 @@
+# Einheitliche Zeilenenden auf Mac und Windows: LF im Repo und in der Arbeitskopie.
+* text=auto eol=lf
+
+# Windows-Skripte brauchen CRLF.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Binärdateien nie anfassen.
+*.jar binary
+*.keystore binary
+*.png binary
+*.jpg binary
+*.webp binary
