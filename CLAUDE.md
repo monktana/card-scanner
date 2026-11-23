@@ -12,6 +12,19 @@ Android-App (nur Pixel 9, nur privat) zum Scannen von Magic-Karten in einer Hand
 - **Sammlung:** Startet leer, kein Import der Namen-Dateien. Flach, mit optionalem Lagerort pro Scan-Sitzung. Kein Wantlist-Abgleich in der App.
 - **Export:** `sammlung.txt` im Namen-Datei-Format (`1 Lightning Bolt (M11) 149`, englischer Oracle-Name, doppelseitige Karten `A // B`, `#! Lagerort` als Gruppen) und `sammlung.csv` mit allen Feldern (Scryfall-ID, Name EN/DE, Set, Nummer, Sprache, Foil, Anzahl, Lagerort, Scan-Datum). Die CSV ist wieder importierbar. Weg: Android-Teilen-Menü → `scripts/scryfall/sammlung/` und Claude-Projekt.
 
+## MVP-Entscheidungen (23.11.2026)
+
+- **Aufbau:** Zwei Reiter, Scannen und Sammlung. Die Sammlung ist eine durchsuchbare Liste mit Bearbeiten, Verschieben und Löschen. Das Menü enthält Exportieren und Import (CSV), die +-Schaltfläche startet die manuelle Suche.
+- **Sprache** kommt automatisch von der Karte (gedrucktes `DE`/`EN`) und ist am Eintrag korrigierbar.
+- **Foil:** Schalter „Foil-Modus“ pro Scan-Sitzung, zusätzlich pro Eintrag in der Liste der letzten Scans umschaltbar.
+- **Rückmeldung:** Vibration + Ton bei Treffer. Ist eine Karte nach etwa 3 s nicht erkannt, gibt es ein eigenes Signal und einen roten Hinweis „Nicht erkannt – beiseitelegen“.
+- **Eintrag** = Druckversion (Scryfall-ID, je Sprache verschieden) + Foil + Lagerort, dazu die Anzahl. Die Kartendaten (Name EN/DE, Set, Nummer, Bild-URL) werden beim Hinzufügen gespeichert, damit Liste und Export offline funktionieren.
+- **Lagerort** hat eine Art, *Deck* oder *Bulk*, und einen Namen (Freitext mit Vorschlägen). Decknamen sind per Konvention die Ordnernamen aus `scripts/scryfall` (z. B. `multiverse-reforged`). Die App kennt keine Decklisten, nur den Ort der Karten.
+- **Deck neu scannen:** Gibt es den Decknamen schon, fragt die App „Ersetzen“ oder „Ergänzen“. Beim Ersetzen werden die alten Einträge erst beim Abschließen der Sitzung entfernt. Karten, die nicht mehr im Deck sind, landen im Bulk-Lagerort „Aus Decks“.
+- **Verschieben** am Eintrag, mit Anzahl und Ziel-Lagerort.
+- **Export:** Feste Dateinamen `sammlung.txt` und `sammlung.csv`, beide zusammen über das Teilen-Menü. Die Gruppen heißen `#! Deck: <name>`, `#! Bulk: <name>` und `#! Ohne Lagerort`. Die CSV hat die zusätzliche Spalte `art`.
+- **Diagnose-Ansicht** (ausgeblendet, langes Drücken auf den Scan-Reiter): Rohtext, „Nicht erkannt: Bild speichern“, `treffer.csv`. Werkzeug zum Verbessern des Parsers.
+
 ## Reihenfolge
 
 1. **Spike (abgeschlossen 23.11.2026):** Kamera-Vorschau mit Live-OCR, Anzeige von gelesenem Wert und Scryfall-Treffer, ohne Speichern. Ergebnis: Der OCR-Ansatz trägt. Zweiter Lauf 14 von 15 erkannt (DE/EN, 9 Sets, Basic Lands), 0,8–1,5 s von der ersten Erkennung bis zum Treffer. Die eine Ausnahme ist eine alte Karte ohne Set-Code (Prophecy, 2000). Sven hat nur diese eine alte Karte.

@@ -14,10 +14,20 @@ _Vermeiden_: Edition, Version
 Ein physisches Stück einer Druckversion. Die Anzahl zählt Exemplare.
 
 **Lagerort**:
-Wo Exemplare liegen (Box, Binder). Im Export wird er zur Gruppe.
+Wo Exemplare physisch liegen. Hat eine Art (Deck oder Bulk) und einen Namen. Im Export wird er zur Gruppe (`#! Deck: vivi-ornitier`).
+
+**Deck**:
+Lagerort-Art für ein gebautes Deck. Der Name ist der Ordnername des Decks in `scripts/scryfall`.
+
+**Bulk**:
+Lagerort-Art für lose Karten, z. B. eine Box. „Aus Decks“ ist der Bulk-Lagerort für Karten, die beim Neuscannen aus einem Deck gefallen sind.
+_Vermeiden_: Lose, Vorrat
+
+**Eintrag**:
+Eine Zeile der Sammlung: Druckversion + Foil + Lagerort, dazu die Anzahl der Exemplare.
 
 **Scan-Sitzung**:
-Ein Dauerscan-Durchlauf mit einem festen Lagerort.
+Ein Dauerscan-Durchlauf mit einem festen Lagerort. Eine Deck-Sitzung kann ein vorhandenes Deck ersetzen oder ergänzen.
 
 **Namen-Datei**:
 Eine Liste von Kartennamen, eine Karte pro Zeile (`1 Name (SET) Nr`), optional mit `#! Gruppe`. `sammlung.txt` ist eine Namen-Datei.
