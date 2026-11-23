@@ -156,9 +156,14 @@ class ScryfallClient {
 
     private fun encode(value: String): String = URLEncoder.encode(value, "UTF-8").replace("+", "%20")
 
-    private companion object {
-        const val BASE = "https://api.scryfall.com"
+    companion object {
+        private const val BASE = "https://api.scryfall.com"
+
+        /**
+         * Scryfall lehnt Standard-User-Agents von HTTP-Bibliotheken ab (400 generic_user_agent),
+         * auch beim Bildserver cards.scryfall.io. Wird daher auch vom Bildlader genutzt.
+         */
         const val USER_AGENT = "CardScanner/0.2 (private collection scanner)"
-        const val MIN_INTERVAL_MS = 120L
+        private const val MIN_INTERVAL_MS = 120L
     }
 }

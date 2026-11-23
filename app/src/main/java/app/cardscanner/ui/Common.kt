@@ -32,6 +32,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.painter.ColorPainter
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -39,11 +41,15 @@ import app.cardscanner.data.LocationKind
 import app.cardscanner.data.StorageLocation
 import coil3.compose.AsyncImage
 
+/** Kartenbild; grauer Platzhalter beim Laden, rötlicher, wenn das Bild nicht geladen werden konnte. */
 @Composable
 fun CardThumb(url: String?, description: String, width: Dp = 48.dp) {
     AsyncImage(
         model = url,
         contentDescription = description,
+        placeholder = ColorPainter(Color(0xFF2A2A2A)),
+        error = ColorPainter(Color(0xFF5A2A2A)),
+        fallback = ColorPainter(Color(0xFF2A2A2A)),
         modifier = Modifier
             .size(width = width, height = width * 1.395f)
             .clip(RoundedCornerShape(width / 16)),
